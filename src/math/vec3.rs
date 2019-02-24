@@ -1,3 +1,6 @@
+extern crate rand;
+use rand::Rng;
+
 use std::ops::Add;
 use std::ops::AddAssign;
 use std::ops::Sub;
@@ -14,6 +17,16 @@ pub fn unit_vector(v: Vec3) -> Vec3 {
 
 pub fn dot(v1: Vec3, v2: Vec3) -> f32 {
     v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z()
+}
+
+pub fn random_in_unit_sphere() -> Vec3 {
+    let mut rng = rand::thread_rng();
+    loop {
+        let p = 2.0 * Vec3::new(rng.gen(), rng.gen(), rng.gen()) - Vec3::new(1.0, 1.0, 1.0);
+        if p.squared_length() < 1.0 {
+            return p
+        }
+    }
 }
 
 #[derive(Debug, Copy,Clone)]
