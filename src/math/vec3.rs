@@ -1,15 +1,17 @@
 extern crate rand;
 use rand::Rng;
 
+use std::f32;
+
 use std::ops::Add;
 use std::ops::AddAssign;
-use std::ops::Sub;
-use std::ops::Index;
-use std::ops::Mul;
 use std::ops::Div;
 use std::ops::DivAssign;
+use std::ops::Index;
+use std::ops::Mul;
+use std::ops::Neg;
+use std::ops::Sub;
 
-use std::f32;
 
 pub fn unit_vector(v: Vec3) -> Vec3 {
     v / v.length()
@@ -33,6 +35,23 @@ pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - 2.0 * dot(v, n) * n
 }
 
+pub fn refract(v: Vec3, n: Vec3, ni_over_nt: f32) -> Option<Vec3> {
+    let uv = unit_vector(v);
+    let dt = dot(uv, n);
+    let d = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
+    if d > 0.0 {
+        let refracted = ni_over_nt * (uv - n * dt) - n * d.sqrt();
+        return Some(refracted)
+    }
+    None
+}
+
+pub fn shclick(cosine: f32, refraction_index: f32) -> f32{
+    let r0 = (1.0 - refraction_index) / (1.0 + refraction_index);
+    let r0_sq = r0 * r0;
+    r0_sq + (1.0 - r0_sq) * (1.0 - cosine).powi(5)
+}
+
 #[derive(Debug, Copy,Clone)]
 pub struct Vec3{
     e: [f32;3]
@@ -48,6 +67,12 @@ impl Vec3 {
     pub fn zero() -> Vec3 {
         Vec3 {
             e: [0.0, 0.0, 0.0]
+        }
+    }
+
+    pub fn one() -> Vec3 {
+        Vec3 {
+            e: [1.0, 1.0, 1.0]
         }
     }
 
@@ -151,5 +176,13 @@ impl Index<usize> for Vec3 {
 
     fn index(&self, i: usize) -> &f32 {
         &self.e[i]
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        self * -1.0
     }
 }

@@ -1,3 +1,6 @@
+extern crate rand;
+use rand::Rng;
+
 use crate::math::ray::Ray;
 use crate::math::vec3::*;
 use super::hitable::HitRecord;
@@ -43,5 +46,58 @@ impl Material for Metal {
         let reflected = reflect(unit_vector(ray_in.direction()), rec.normal);
         let scattered = Ray::new(rec.p, reflected);
         (dot(scattered.direction(), rec.normal) > 0.0, self.albedo, scattered)
+    }
+}
+
+pub struct Dielectric {
+    refraction_index: f32
+}
+
+impl Dielectric {
+    pub fn new(refraction_index: f32) -> Self {
+        Dielectric {
+            refraction_index
+        }
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, ray_in: &Ray, rec: &HitRecord) -> (bool, Vec3, Ray) {
+        let reflected = reflect(ray_in.direction(), rec.normal);
+        let attenuation = Vec3::one();
+        let outward_normal;
+        let ni_over_nt;
+        let cosine;
+        let d = dot(ray_in.direction(), rec.normal);
+        if d > 0.0 {
+            outward_normal = -rec.normal;
+            ni_over_nt = self.refraction_index;
+            cosine = self.refraction_index * d / ray_in.direction().length();
+        }
+        else {
+            outward_normal = rec.normal;
+            ni_over_nt = 1.0 / self.refraction_index;
+            cosine = -d / ray_in.direction().length();
+        }
+
+        let mut refracted = Vec3::zero();
+        let reflection_probability;
+        if let Some(r) = refract(ray_in.direction(), outward_normal, ni_over_nt) {
+            refracted = r;
+            reflection_probability = shclick(cosine, self.refraction_index);
+        }
+        else {
+            reflection_probability = 1.0        
+        }
+
+        let mut rng = rand::thread_rng();
+        if rng.gen::<f32>() < reflection_probability {
+            let scattered = Ray::new(rec.p, reflected);
+            return (true, attenuation, scattered)
+        }
+        else {
+            let scattered = Ray::new(rec.p, refracted);
+            return (true, attenuation, scattered)            
+        }
     }
 }
