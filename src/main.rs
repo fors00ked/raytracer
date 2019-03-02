@@ -55,8 +55,8 @@ fn main() {
         Err(e)      => panic!("Could not create file: {} error: {:?}", file_name, e.kind()),
     };
 
-    let width = 800;
-    let height = 400;
+    let width = 1200;
+    let height = 600;
 
     write!(file, "P3\n{} {}\n255\n", width,height).expect("Could not write to file");
     let hitable: Vec<Box<Hitable>> = vec![
@@ -68,7 +68,7 @@ fn main() {
     ];
 
     let world = HitableList::new(hitable);
-    let camera = Camera::new();
+    let camera = Camera::new(Vec3::new(-2.0, 2.0, 1.0), Vec3::new(0.0, 0.0, -1.0), Vec3::new(0.0, 1.0, 0.0), 90.0, (width as f32) / (height as f32));
 
     let mut rng = rand::thread_rng();
     let num_samples = 100;
