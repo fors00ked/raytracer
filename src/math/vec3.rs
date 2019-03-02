@@ -29,6 +29,10 @@ pub fn random_in_unit_sphere() -> Vec3 {
     }
 }
 
+pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
+    v - 2.0 * dot(v, n) * n
+}
+
 #[derive(Debug, Copy,Clone)]
 pub struct Vec3{
     e: [f32;3]
@@ -92,6 +96,16 @@ impl Sub for Vec3 {
     fn sub(self, rhs: Vec3) -> Self {
         Vec3 {
             e: [self.e[0] - rhs.e[0], self.e[1] - rhs.e[1], self.e[2] - rhs.e[2]]
+        }
+    }
+}
+
+impl Mul for Vec3 {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        Vec3 {
+            e: [self.e[0] * rhs.e[0], self.e[1] * rhs.e[1], self.e[2] * rhs.e[2]]
         }
     }
 }

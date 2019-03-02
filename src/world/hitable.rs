@@ -1,13 +1,16 @@
 use crate::math::vec3::Vec3;
 use crate::math::ray::Ray;
 use crate::math::vec3::dot as dot;
+use super::materials::Material;
 
 use std::vec::Vec;
+use std::rc::Rc;
 
 pub struct HitRecord {
     pub t: f32,
     pub p: Vec3,
-    pub normal: Vec3
+    pub normal: Vec3,
+    pub material: Option<Rc<dyn Material>>
 }
 
 impl HitRecord {
@@ -16,6 +19,7 @@ impl HitRecord {
             t: 0.0,
             p: Vec3::zero(),
             normal: Vec3::zero(),
+            material: None
         }
     }
 }
@@ -26,13 +30,14 @@ pub trait Hitable {
 
 pub struct Sphere {
     center: Vec3,
-    radius: f32
+    radius: f32,
+    material: Rc<dyn Material>
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32) -> Self {
+    pub fn new(center: Vec3, radius: f32, material: Rc<dyn Material>) -> Self {
         Sphere {
-            center, radius
+            center, radius, material
         }
     }
 }
@@ -41,22 +46,24 @@ impl Hitable for Sphere {
     fn hit(&self, r: &Ray, t_min: f32, t_max:f32, rec: &mut HitRecord) -> bool {
         let oc = r.origin() - self.center;
         let a = dot(r.direction(), r.direction());
-        let b = 2.0 * dot(oc, r.direction());
+        let b = dot(oc, r.direction());
         let c = dot(oc, oc) - self.radius * self.radius;
-        let d = b * b - 4.0 * a * c;
+        let d = b * b - a * c;
         if d > 0.0 {
-            let temp = (-b - d.sqrt()) / (2.0 * a);
+            let temp = (-b - d.sqrt()) / a;
             if temp < t_max && temp > t_min {
                 rec.t = temp;
                 rec.p = r.point_at_parameter(temp);
                 rec.normal = (rec.p - self.center) / self.radius;
+                rec.material = Some(Rc::clone(&self.material));
                 return true
             }
-            let temp = (-b + d.sqrt()) / (2.0 * a);
+            let temp = (-b + d.sqrt()) / a;
             if temp < t_max && temp > t_min {
                 rec.t = temp;
                 rec.p = r.point_at_parameter(temp);
                 rec.normal = (rec.p - self.center) / self.radius;
+                rec.material = Some(Rc::clone(&self.material));
                 return true
             }
         }
@@ -88,6 +95,7 @@ impl Hitable for HitableList {
                 rec.t = temp_rec.t;
                 rec.p = temp_rec.p;
                 rec.normal = temp_rec.normal;
+                rec.material = temp_rec.material.as_ref().and_then(|x| Some(Rc::clone(x)));
             }
         }
         hit
