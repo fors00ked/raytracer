@@ -67,37 +67,37 @@ impl Material for Dielectric {
         let attenuation = Vec3::one();
         let outward_normal;
         let ni_over_nt;
-        let cosine;
         let d = dot(ray_in.direction(), rec.normal);
-        if d > 0.0 {
-            outward_normal = -rec.normal;
-            ni_over_nt = self.refraction_index;
-            cosine = self.refraction_index * d / ray_in.direction().length();
-        }
-        else {
-            outward_normal = rec.normal;
-            ni_over_nt = 1.0 / self.refraction_index;
-            cosine = -d / ray_in.direction().length();
-        }
-
+        let cosine = {
+            if d > 0.0 {
+                outward_normal = -rec.normal;
+                ni_over_nt = self.refraction_index;
+                self.refraction_index * d / ray_in.direction().length()
+            }
+            else {
+                outward_normal = rec.normal;
+                ni_over_nt = 1.0 / self.refraction_index;
+                -d / ray_in.direction().length()
+            }
+        };
         let mut refracted = Vec3::zero();
-        let reflection_probability;
-        if let Some(r) = refract(ray_in.direction(), outward_normal, ni_over_nt) {
-            refracted = r;
-            reflection_probability = shclick(cosine, self.refraction_index);
-        }
-        else {
-            reflection_probability = 1.0        
-        }
-
+        let reflection_probability = {
+            if let Some(r) = refract(ray_in.direction(), outward_normal, ni_over_nt) {
+                refracted = r;
+                shclick(cosine, self.refraction_index)
+            }
+            else {
+                1.0
+            }
+        };
         let mut rng = rand::thread_rng();
         if rng.gen::<f32>() < reflection_probability {
             let scattered = Ray::new(rec.p, reflected);
-            return (true, attenuation, scattered)
+            (true, attenuation, scattered)
         }
         else {
             let scattered = Ray::new(rec.p, refracted);
-            return (true, attenuation, scattered)            
+            (true, attenuation, scattered)
         }
     }
 }
