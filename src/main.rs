@@ -5,7 +5,6 @@ use std::path::Path;
 use std::fs::File;
 use std::io::Write;
 use std::f32;
-
 use std::rc::Rc;
 
 mod math;
@@ -13,6 +12,7 @@ use math::vec3::Vec3;
 use math::ray::Ray;
 
 mod world;
+use world::bvh::*;
 use world::hitable::*;
 use world::camera::*;
 use world::materials::*;
@@ -47,29 +47,29 @@ fn color(r: Ray, world: &dyn Hitable, depth: i32) -> Vec3 {
     }
 }
 
-fn random_scene(rng: &mut rand::prelude::ThreadRng) -> Vec<Box<Hitable>> {
-    let mut hitable: Vec<Box<Hitable>> = vec![];
-    hitable.push(Box::new(Sphere::new(Vec3::new(0.0, -1000.0, 0.0), 1000.0, Rc::new(Lambertian::new(Vec3::new(0.5, 0.5, 0.5))))));
+fn random_scene(rng: &mut rand::prelude::ThreadRng) -> Vec<Rc<dyn Hitable>> {
+    let mut hitable: Vec<Rc<dyn Hitable>> = vec![];
+    hitable.push(Rc::new(Sphere::new(Vec3::new(0.0, -1000.0, 0.0), 1000.0, Rc::new(Lambertian::new(Vec3::new(0.5, 0.5, 0.5))))));
     for a in -11..11 {
         for b in -11..11 {
             let center = Vec3::new(a as f32 + 0.9 * rng.gen::<f32>(), 0.2, b as f32 + 0.9 * rng.gen::<f32>());
             let rand = rng.gen::<f32>();
             if (center - Vec3::new(4.9, 0.2, 0.0)).length() > 0.9 {
                 if rand < 0.8 {
-                    hitable.push(Box::new(Sphere::new(center, 0.2, Rc::new(Lambertian::new(Vec3::new(rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>()* rng.gen::<f32>()))))));
+                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Lambertian::new(Vec3::new(rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>()* rng.gen::<f32>()))))));
                 }
                 else if rand < 0.95 {
-                    hitable.push(Box::new(Sphere::new(center, 0.2, Rc::new(Metal::new(Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())))))));
+                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Metal::new(Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())))))));
                 }
                 else {
-                    hitable.push(Box::new(Sphere::new(center, 0.2, Rc::new(Dielectric::new(1.5)))));
+                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Dielectric::new(1.5)))));
                 }
             }
         }
     }
-    hitable.push(Box::new(Sphere::new(Vec3::new(0.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.3, 0.9, 0.4))))));
-    hitable.push(Box::new(Sphere::new(Vec3::new(-4.0, 1.0, 0.0), 1.0, Rc::new(Lambertian::new(Vec3::new(0.4, 0.2, 0.1))))));
-    hitable.push(Box::new(Sphere::new(Vec3::new(4.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.7, 0.6, 0.5))))));
+    hitable.push(Rc::new(Sphere::new(Vec3::new(0.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.3, 0.9, 0.4))))));
+    hitable.push(Rc::new(Sphere::new(Vec3::new(-4.0, 1.0, 0.0), 1.0, Rc::new(Lambertian::new(Vec3::new(0.4, 0.2, 0.1))))));
+    hitable.push(Rc::new(Sphere::new(Vec3::new(4.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.7, 0.6, 0.5))))));
     hitable
 }
 
@@ -81,12 +81,12 @@ fn main() {
         Err(e)      => panic!("Could not create file: {} error: {:?}", file_name, e.kind()),
     };
 
-    let width = 1200;
-    let height = 600;
+    let width = 800;
+    let height = 400;
 
     write!(file, "P3\n{} {}\n255\n", width,height).expect("Could not write to file");
     let mut rng = rand::thread_rng();
-    let hitable: Vec<Box<Hitable>> = random_scene(&mut rng);
+    let mut hitable: Vec<Rc<Hitable>> = random_scene(&mut rng);
         /*vec![
             Box::new(Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5, Rc::new(Lambertian::new(Vec3::new(0.8, 0.3, 0.3))))),
             Box::new(Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, Rc::new(Lambertian::new(Vec3::new(0.8, 0.8, 0.0))))),
@@ -95,7 +95,7 @@ fn main() {
             Box::new(Sphere::new(Vec3::new(-1.0, 0.0, -1.0), -0.45, Rc::new(Dielectric::new(1.5)))),
         ];*/
 
-    let world = HitableList::new(hitable);
+    let world = BvhNode::new(&mut hitable);
     let look_from = Vec3::new(13.0, 2.0, 3.0);
     let look_at = Vec3::new(0.0, 0.0, 0.0);
     let camera = Camera::new(look_from, look_at, Vec3::new(0.0, 1.0, 0.0), 20.0, (width as f32) / (height as f32), 0.1, 10.0);

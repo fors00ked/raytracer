@@ -72,7 +72,7 @@ pub fn shclick(cosine: f32, refraction_index: f32) -> f32{
     r0_sq + (1.0 - r0_sq) * (1.0 - cosine).powi(5)
 }
 
-#[derive(Debug, Copy,Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Vec3{
     e: [f32;3]
 }

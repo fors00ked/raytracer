@@ -1,3 +1,4 @@
+use crate::math::aabb::*;
 use crate::math::vec3::Vec3;
 use crate::math::ray::Ray;
 use crate::math::vec3::dot as dot;
@@ -24,8 +25,14 @@ impl HitRecord {
     }
 }
 
+pub struct AabbResult {
+    pub result: bool,
+    pub aabb: Aabb,
+}
+
 pub trait Hitable {
     fn hit(&self, r: &Ray, t_min: f32, t_max:f32, rec: &mut HitRecord) -> bool;
+    fn bounding_box(&self) -> AabbResult;
 }
 
 pub struct Sphere {
@@ -69,14 +76,26 @@ impl Hitable for Sphere {
         }
         false
     }
+
+    fn bounding_box(&self) -> AabbResult {
+        AabbResult {
+            result: true,
+            aabb: Aabb::new(
+                self.center - Vec3::new(self.radius, self.radius, self.radius),
+                self.center + Vec3::new(self.radius, self.radius, self.radius)
+            )
+        }
+    }
 }
 
+#[allow(dead_code)]
 pub struct HitableList {
-    list: Vec<Box<dyn Hitable>>
+    list: Vec<Rc<dyn Hitable>>
 }
 
 impl HitableList {
-    pub fn new(list: Vec<Box<dyn Hitable>>) -> Self {
+    #[allow(dead_code)]
+    pub fn new(list: Vec<Rc<dyn Hitable>>) -> Self {
         HitableList {
             list
         }
@@ -99,6 +118,32 @@ impl Hitable for HitableList {
             }
         }
         hit
+    }
+
+    fn bounding_box(&self) -> AabbResult {
+        let mut temp = AabbResult {
+            result: false,
+            aabb: Aabb::new(Vec3::zero(), Vec3::zero())
+        };
+
+        if self.list.len() < 1 {
+            return temp
+        }
+
+        let first_result = self.list[0].bounding_box();
+        if first_result.result == false {
+            return temp;
+        }
+
+        for l in self.list.iter() {
+            let result = l.bounding_box();
+            if result.result == true {
+                temp.aabb = surrounding_box(temp.aabb, result.aabb);
+            }
+        }
+
+        temp.result = true;
+        temp
     }
 }
 
