@@ -1,11 +1,14 @@
 extern crate rand;
 use rand::Rng;
 
+extern crate rayon;
+use rayon::prelude::*;
+
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
 use std::f32;
-use std::rc::Rc;
+use std::sync::Arc;
 
 mod math;
 use math::vec3::Vec3;
@@ -47,29 +50,30 @@ fn color(r: Ray, world: &dyn Hitable, depth: i32) -> Vec3 {
     }
 }
 
-fn random_scene(rng: &mut rand::prelude::ThreadRng) -> Vec<Rc<dyn Hitable>> {
-    let mut hitable: Vec<Rc<dyn Hitable>> = vec![];
-    hitable.push(Rc::new(Sphere::new(Vec3::new(0.0, -1000.0, 0.0), 1000.0, Rc::new(Lambertian::new(Vec3::new(0.5, 0.5, 0.5))))));
+fn random_scene() -> Vec<Arc<dyn Hitable+Send+Sync>> {
+    let mut rng = rand::thread_rng();
+    let mut hitable: Vec<Arc<dyn Hitable+Send+Sync>> = vec![];
+    hitable.push(Arc::new(Sphere::new(Vec3::new(0.0, -1000.0, 0.0), 1000.0, Arc::new(Lambertian::new(Vec3::new(0.5, 0.5, 0.5))))));
     for a in -11..11 {
         for b in -11..11 {
             let center = Vec3::new(a as f32 + 0.9 * rng.gen::<f32>(), 0.2, b as f32 + 0.9 * rng.gen::<f32>());
             let rand = rng.gen::<f32>();
             if (center - Vec3::new(4.9, 0.2, 0.0)).length() > 0.9 {
                 if rand < 0.8 {
-                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Lambertian::new(Vec3::new(rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>()* rng.gen::<f32>()))))));
+                    hitable.push(Arc::new(Sphere::new(center, 0.2, Arc::new(Lambertian::new(Vec3::new(rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>() * rng.gen::<f32>(), rng.gen::<f32>()* rng.gen::<f32>()))))));
                 }
                 else if rand < 0.95 {
-                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Metal::new(Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())))))));
+                    hitable.push(Arc::new(Sphere::new(center, 0.2, Arc::new(Metal::new(Vec3::new(0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>()), 0.5 * (1.0 + rng.gen::<f32>())))))));
                 }
                 else {
-                    hitable.push(Rc::new(Sphere::new(center, 0.2, Rc::new(Dielectric::new(1.5)))));
+                    hitable.push(Arc::new(Sphere::new(center, 0.2, Arc::new(Dielectric::new(1.5)))));
                 }
             }
         }
     }
-    hitable.push(Rc::new(Sphere::new(Vec3::new(0.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.3, 0.9, 0.4))))));
-    hitable.push(Rc::new(Sphere::new(Vec3::new(-4.0, 1.0, 0.0), 1.0, Rc::new(Lambertian::new(Vec3::new(0.4, 0.2, 0.1))))));
-    hitable.push(Rc::new(Sphere::new(Vec3::new(4.0, 1.0, 0.0), 1.0, Rc::new(Metal::new(Vec3::new(0.7, 0.6, 0.5))))));
+    hitable.push(Arc::new(Sphere::new(Vec3::new(0.0, 1.0, 0.0), 1.0, Arc::new(Metal::new(Vec3::new(0.3, 0.9, 0.4))))));
+    hitable.push(Arc::new(Sphere::new(Vec3::new(-4.0, 1.0, 0.0), 1.0, Arc::new(Lambertian::new(Vec3::new(0.4, 0.2, 0.1))))));
+    hitable.push(Arc::new(Sphere::new(Vec3::new(4.0, 1.0, 0.0), 1.0, Arc::new(Metal::new(Vec3::new(0.7, 0.6, 0.5))))));
     hitable
 }
 
@@ -85,8 +89,7 @@ fn main() {
     let height = 400;
 
     write!(file, "P3\n{} {}\n255\n", width,height).expect("Could not write to file");
-    let mut rng = rand::thread_rng();
-    let mut hitable: Vec<Rc<Hitable>> = random_scene(&mut rng);
+    let mut hitable: Vec<Arc<Hitable+Send+Sync>> = random_scene();
         /*vec![
             Box::new(Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5, Rc::new(Lambertian::new(Vec3::new(0.8, 0.3, 0.3))))),
             Box::new(Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0, Rc::new(Lambertian::new(Vec3::new(0.8, 0.8, 0.0))))),
@@ -101,21 +104,31 @@ fn main() {
     let camera = Camera::new(look_from, look_at, Vec3::new(0.0, 1.0, 0.0), 20.0, (width as f32) / (height as f32), 0.1, 10.0);
 
     let num_samples = 100;
+
+    let mut color_buf = vec![vec![Vec3::zero(); width]; height];
     
-    for j in (0 .. height).rev() {
-        for i in 0 .. width {
+    color_buf.par_iter_mut().enumerate().for_each(|(i, pixel)| {
+        let mut rng = rand::thread_rng();
+        for j in 0 .. width {
             let mut col = Vec3::zero();
             for _s in 0..num_samples {
-                let u = (i as f32 + rng.gen::<f32>()) / (width as f32);
-                let v = (j as f32 + rng.gen::<f32>()) / (height as f32);
+                let u = (j as f32 + rng.gen::<f32>()) / (width as f32);
+                let v = (i as f32 + rng.gen::<f32>()) / (height as f32);
                 let ray = camera.get_ray(u,v);
                 col += color(ray, &world, 0);
             }
             col /= num_samples as f32;
+            (*pixel)[j] = col;
+        }
+    });
+
+    for i in (0 .. height).rev() {
+        for j in 0 .. width {
+            let col = color_buf[i][j];
             let r = (255.99 * col[0].sqrt()) as i32;
             let g = (255.99 * col[1].sqrt()) as i32;
             let b = (255.99 * col[2].sqrt()) as i32;
-            write!(file, "{} {} {}\n", r, g, b).expect("Could not write to file");;
+            write!(file, "{} {} {}\n", r, g, b).expect("Could not write to file");
         }
     }
 }

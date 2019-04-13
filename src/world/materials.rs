@@ -5,7 +5,7 @@ use crate::math::ray::Ray;
 use crate::math::vec3::*;
 use super::hitable::HitRecord;
 
-pub trait Material {
+pub trait Material: Send+Sync {
     fn scatter(&self, ray_in: &Ray, rec: &HitRecord) -> (bool, Vec3, Ray);
 }
 

@@ -5,13 +5,13 @@ use crate::math::vec3::dot as dot;
 use super::materials::Material;
 
 use std::vec::Vec;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct HitRecord {
     pub t: f32,
     pub p: Vec3,
     pub normal: Vec3,
-    pub material: Option<Rc<dyn Material>>
+    pub material: Option<Arc<dyn Material>>
 }
 
 impl HitRecord {
@@ -30,7 +30,7 @@ pub struct AabbResult {
     pub aabb: Aabb,
 }
 
-pub trait Hitable {
+pub trait Hitable: Send+Sync {
     fn hit(&self, r: &Ray, t_min: f32, t_max:f32, rec: &mut HitRecord) -> bool;
     fn bounding_box(&self) -> AabbResult;
 }
@@ -38,11 +38,11 @@ pub trait Hitable {
 pub struct Sphere {
     center: Vec3,
     radius: f32,
-    material: Rc<dyn Material>
+    material: Arc<dyn Material>
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32, material: Rc<dyn Material>) -> Self {
+    pub fn new(center: Vec3, radius: f32, material: Arc<dyn Material>) -> Self {
         Sphere {
             center, radius, material
         }
@@ -62,7 +62,7 @@ impl Hitable for Sphere {
                 rec.t = temp;
                 rec.p = r.point_at_parameter(temp);
                 rec.normal = (rec.p - self.center) / self.radius;
-                rec.material = Some(Rc::clone(&self.material));
+                rec.material = Some(Arc::clone(&self.material));
                 return true
             }
             let temp = (-b + d.sqrt()) / a;
@@ -70,7 +70,7 @@ impl Hitable for Sphere {
                 rec.t = temp;
                 rec.p = r.point_at_parameter(temp);
                 rec.normal = (rec.p - self.center) / self.radius;
-                rec.material = Some(Rc::clone(&self.material));
+                rec.material = Some(Arc::clone(&self.material));
                 return true
             }
         }
@@ -90,12 +90,12 @@ impl Hitable for Sphere {
 
 #[allow(dead_code)]
 pub struct HitableList {
-    list: Vec<Rc<dyn Hitable>>
+    list: Vec<Arc<dyn Hitable>>
 }
 
 impl HitableList {
     #[allow(dead_code)]
-    pub fn new(list: Vec<Rc<dyn Hitable>>) -> Self {
+    pub fn new(list: Vec<Arc<dyn Hitable>>) -> Self {
         HitableList {
             list
         }
@@ -114,7 +114,7 @@ impl Hitable for HitableList {
                 rec.t = temp_rec.t;
                 rec.p = temp_rec.p;
                 rec.normal = temp_rec.normal;
-                rec.material = temp_rec.material.as_ref().and_then(|x| Some(Rc::clone(x)));
+                rec.material = temp_rec.material.as_ref().and_then(|x| Some(Arc::clone(x)));
             }
         }
         hit

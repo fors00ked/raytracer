@@ -2,13 +2,13 @@ extern crate rand;
 use rand::Rng;
 
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::math::aabb::*;
 use crate::math::ray::*;
 use super::hitable::*;
 
-fn sort(list: &mut[Rc<dyn Hitable>], axis: usize) {
+fn sort(list: &mut[Arc<dyn Hitable+Send+Sync>], axis: usize) {
     list.sort_by(
         |a, b| {
             let result1 = a.bounding_box();
@@ -28,12 +28,12 @@ fn sort(list: &mut[Rc<dyn Hitable>], axis: usize) {
 
 pub struct BvhNode {
     aabb: Aabb,
-    left: Rc<dyn Hitable>,
-    right: Rc<dyn Hitable>,
+    left: Arc<dyn Hitable+Send+Sync>,
+    right: Arc<dyn Hitable+Send+Sync>,
 }
 
 impl BvhNode {
-    pub fn new(list: &mut[Rc<dyn Hitable>]) -> BvhNode {
+    pub fn new(list: &mut[Arc<dyn Hitable+Send+Sync>]) -> BvhNode {
         let mut rng = rand::thread_rng();
         let axis: u32 = rng.gen_range(0, 3);
         if axis == 0 {
@@ -46,20 +46,20 @@ impl BvhNode {
             sort(list, 2);
         }
 
-        let left: Rc<dyn Hitable>;
-        let right: Rc<dyn Hitable>;
+        let left: Arc<dyn Hitable+Send+Sync>;
+        let right: Arc<dyn Hitable+Send+Sync>;
         if list.len() == 1 {
-            left = Rc::clone(&list[0]);
-            right = Rc::clone(&left);
+            left = Arc::clone(&list[0]);
+            right = Arc::clone(&left);
         }
         else if list.len() == 1 {
-            left = Rc::clone(&list[0]);
-            right = Rc::clone(&list[1]);
+            left = Arc::clone(&list[0]);
+            right = Arc::clone(&list[1]);
         }
         else {
             let center = list.len() / 2;
-            left = Rc::new(BvhNode::new(&mut list[0..center]));
-            right = Rc::new(BvhNode::new(&mut list[center..]));
+            left = Arc::new(BvhNode::new(&mut list[0..center]));
+            right = Arc::new(BvhNode::new(&mut list[center..]));
         }
 
         let left_result = left.bounding_box();
@@ -70,8 +70,8 @@ impl BvhNode {
 
         BvhNode {
             aabb: surrounding_box(left_result.aabb, right_result.aabb),
-            left: Rc::clone(&left),
-            right: Rc::clone(&right)
+            left: Arc::clone(&left),
+            right: Arc::clone(&right)
         }
     }
 }
