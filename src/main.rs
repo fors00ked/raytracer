@@ -78,7 +78,7 @@ fn random_scene() -> Vec<Arc<dyn Hitable+Send+Sync>> {
 }
 
 fn main() {
-    let file_name = "outpu.ppm";
+    let file_name = "output.ppm";
     let file_path = Path::new(file_name);
     let mut file = match File::create(file_path) {
         Ok(file)    => file,
